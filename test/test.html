@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>Unit tests for jquery.cookie.js</title>
+		<link rel="stylesheet" href="testsuite.css" type="text/css" media="screen" charset="utf-8" />
+	</head>
+	<body>
+		<h1>jquery.cookie.js</h1>
+		<h2 id="banner"></h2>
+		<h2 id="userAgent"></h2>
+		
+		<ol id="tests"></ol>
+		
+		<div id="main"></div>
+		<script type="text/javascript" src="jquery.js"></script>
+		<script type="text/javascript" src="../jquery.cookie.js"></script>
+		<script type="text/javascript" src="../jquery.cookie.multi.js"></script>
+		<script type="text/javascript" src="testrunner.js"></script>		
+		<script>
+			var tomorrow = new Date();
+			tomorrow.setDate(tomorrow.getDate() +1);
+			var yesterday = new Date();
+			yesterday.setDate(yesterday.getDate() -1);
+			
+			$.cookie.defaults.path = "/";
+			var path = ';path='+ $.cookie.defaults.path;
+				
+			$(function() {				
+				module("Self test");
+				
+				test("Make sure that I know how cookie works", function() {
+					expect(7);
+					writeCookie("sel-f0", "self0", 1);
+					ok(/sel-f0=self0(?:;|$)/.test(document.cookie), "Write and a single String value expiring tomorrow");
+					equals(readCookie("sel-f0"), "self0", "Read the written cookie");
+					clearCookie("self0");
+					equals(readCookie("self0"), false, "Clear the written cookie");
+					writeCookie("self1", "self1", 1);
+					writeCookie("self2", "self2", 1);
+					ok(/(?=(?=.*self1=self1(?:;|$)).*self2=self2(?:;|$))/.test(document.cookie), "Write two String values expiring tomorrow");
+					same([readCookie("self1"), readCookie("self2")], ["self1", "self2"], "Read the two written values");
+					writeCookie("self3", .5, 1);
+					equals(readCookie("self3"), "0.5", "If there is no 0 at the beginning of a decimal, it is added");
+					clearAllCookies();
+					equals(document.cookie, "", "Clear all the cookies");					
+				});
+				
+				module("Legacy Features");
+				
+				var legacySingleWrite = function(cookieLib, options) {
+						expect(9); clearAllCookies();
+						
+						cookieLib("ls0", "ls0", options);
+						ok(/ls0=ls0(?:;|$)/.test(document.cookie), "Write a first String value in an empty cookie");
+						cookieLib("ls1", "ls1", options);
+						ok(/(?=(?=.*ls0=ls0(?:;|$)).*ls1=ls1(?:;|$))/.test(document.cookie), "Write a second String value");
+						cookieLib("ls1", "ls1Bis")
+						ok(/ls1=ls1Bis(?:;|$)/.test(document.cookie), "Overwrite a value");
+						cookieLib("ls2", false, options);
+						ok(/ls2=false(?:;|$)/.test(document.cookie), "Write a Boolean false value");
+						cookieLib("ls3", true, options);
+						ok(/ls3=true(?:;|$)/.test(document.cookie), "Write a Boolean true value");
+						cookieLib("ls4", 0, options);
+						ok(/ls4=0(?:;|$)/.test(document.cookie), "Write the Number 0");
+						cookieLib("ls5", 1, options);
+						ok(/ls5=1(?:;|$)/.test(document.cookie), "Write the Number 1");
+						cookieLib("ls6", .5, options);
+						ok(/ls6=0.5(?:;|$)/.test(document.cookie), "Write a decimal value");
+						cookieLib("ls7", -123.456, options);
+						ok(/ls7=-123.456(?:;|$)/.test(document.cookie), "Write a float value");
+					
+					},legacySingleRead = function(cookieLib) {
+						expect(10); clearAllCookies();
+						
+						equals(cookieLib("ls0"), false, "Try to read an empty cookie");
+						document.cookie = "ls0=ls0"+path;
+						equals(cookieLib("ls0"), "ls0", "Read a first string value");
+						document.cookie = "ls1=ls1"+path;
+						equals(cookieLib("ls1"), "ls1", "Read a second string value");
+						document.cookie = "ls2="+false+path;
+						equals(cookieLib("ls2"), "false", "Read a serialized false value");
+						document.cookie = "ls3="+true+path;
+						equals(cookieLib("ls3"), "true", "Read a serialized true value");
+						document.cookie = "ls4="+0+path;
+						equals(cookieLib("ls4"), "0", "Read a serialized 0");
+						document.cookie = "ls5="+1+path;
+						equals(cookieLib("ls5"), "1", "Read a serialized 1");
+						document.cookie = "ls6="+.5+path;
+						equals(cookieLib("ls6"), "0.5", "Read a serialized decimal");
+						document.cookie = "ls7="+encodeURIComponent(-123.456)+path;
+						equals(cookieLib("ls7"), "-123.456", "Read a serialized float");
+						equals(cookieLib("ls99"), false, "Read an inexistant value");
+					
+					},legacySinlgeErase = function(cookieLib) {
+						expect(3); clearAllCookies();
+						
+						document.cookie = "ls0=ls0"+path;
+						cookieLib("ls0", null);
+						equals(cookieLib("ls0"), false, "Using a null value");
+						document.cookie = "ls1=ls1"+path;
+						cookieLib("ls1", "ls1", {expires: -1});
+						equals(cookieLib("ls1"), false, "Using a negative expiry Number");
+						document.cookie = "ls2=ls2"+path;
+						cookieLib("ls2", "ls2", {expires: yesterday});
+						equals(cookieLib("ls2"), false, "Using a past Date");
+						
+					}, legacyMultipleWrite = function(options) {
+						expect(2); clearAllCookies();
+						
+						$.cookie({lm0: "lm0"}, options);
+						ok(/lm0=lm0/.test(document.cookie), "Writing a single value using an object");
+						$.cookie({lm1: "lm1", lm1: "lm1Bis", lm2: false, lm3: true, lm4: 0, lm5: 1, lm6: .5, lm7: -123.456}, options);
+						ok(/(?=(?=(?=(?=(?=(?=(?=.*lm1=lm1Bis(?:;|$)).*lm2=false(?:;|$)).*lm3=true(?:;|$)).*lm4=0(?:;|$)).*lm5=1(?:;|$)).*lm6=0.5(?:;|$)).*lm7=-123.456(?:;|$))/.test(document.cookie), "Writing multiple values using an object");
+					};
+					
+				
+				test("Write a single value", function() {
+					legacySingleWrite($._cookie);
+				});
+				
+				test("Write a single value with an expiry Date option", function() {
+					legacySingleWrite($._cookie, {expires: tomorrow});
+				});
+				
+				test("Write a single value with an expiry Number option", function() {
+					legacySingleWrite($._cookie, {expires: 1});
+				});
+				
+				test("Read a single value", function() {
+					legacySingleRead($._cookie);
+				});
+				
+				test("Erase a single value", function() {
+					legacySinlgeErase($._cookie);
+				});
+				
+				module("Legacy + multi");
+				
+				test("Write a single value through the 'multi' plugin", function() {
+					legacySingleWrite($.cookie);
+				});
+				
+				test("Write a single value with an expiry Date option through the 'multi' plugin", function() {
+					legacySingleWrite($.cookie, {expires: tomorrow});
+				});
+				
+				test("Write a single value with an expiry Number option through the 'multi' plugin", function() {
+					legacySingleWrite($.cookie, {expires: 1});
+				});
+				
+				test("Read a single value through the 'multi' plugin", function() {
+					legacySingleRead($.cookie);
+				});
+				
+				test("Erase a single value through the 'multi' plugin", function() {
+					legacySinlgeErase($.cookie);
+				});
+				
+				test("Write multiple values", function() {					
+					legacyMultipleWrite();
+				});
+				
+				test("Write multiple values with an expiry Date", function() {					
+					legacyMultipleWrite({expires: tomorrow});
+				});
+				
+				test("Write multiple values with an expiry Number", function() {					
+					legacyMultipleWrite({expires: 1});
+				});
+				
+				test("Read multiple values", function() {					
+					expect(3); clearAllCookies();
+					
+					equals($.cookie(true), false, "Read an empty cookie");
+					document.cookie = "lm0=lm0"+path;
+					same($.cookie(true), {lm0: "lm0"}, "Read a cookie with a single value");
+					document.cookie = "lm1=lm1"+path;
+					document.cookie = "lm2="+false+path;
+					document.cookie = "lm3="+true+path;
+					document.cookie = "lm4="+0+path;
+					document.cookie = "lm5="+1+path;
+					document.cookie = "lm6="+.5+path;
+					document.cookie = "lm7="+encodeURIComponent(-123.456)+path;
+					same($.cookie(true), {lm0: "lm0", lm1: "lm1", lm2: "false", lm3: "true", lm4: "0", lm5: "1", lm6: "0.5", lm7: "-123.456"}, "Read a cookie with multiple values");
+				});
+				
+				test("Erase multiple values", function() {
+					expect(3); clearAllCookies();
+					
+					document.cookie = "lm8=lm8"+path;
+					document.cookie = "lm9=lm9"+path;
+					$.cookie({lm8: null, lm9: null});
+					equals(document.cookie, "", "Using null values");
+					document.cookie = "lm10=lm10"+path;
+					document.cookie = "lm11=lm11"+path;
+					$.cookie({lm10: "lm10", lm11: "lm11"}, {expires: -1});
+					equals(document.cookie, "", "Using a negative expiry Number");
+					document.cookie = "lm12=lm12"+path;
+					document.cookie = "lm13=lm13"+path;
+					$.cookie({lm12: "lm12", lm13: "lm13"}, {expires: yesterday});
+					equals(document.cookie, "", "Using a past expiry Date");
+				});
+				
+				module("New features");
+				
+				var newSingleWrite = function(cookieLib, options) {
+						expect(9); clearAllCookies();
+						
+						cookieLib("ns0", "ns0", options);
+						ok(/ns0=ns0(?:;|$)/.test(document.cookie), "Write a first String value in an empty cookie");
+						cookieLib("ns1", "ns1", options);
+						ok(/(?=(?=.*ns0=ns0(?:;|$)).*ns1=ns1(?:;|$))/.test(document.cookie), "Write a second String value");
+						cookieLib("ns1", "ns1Bis")
+						ok(/ns1=ns1Bis(?:;|$)/.test(document.cookie), "Overwrite a value");
+						cookieLib("ns2", false, options);
+						ok(/ns2=0(?:;|$)/.test(document.cookie), "Write a Boolean false value");
+						cookieLib("ns3", true, options);
+						ok(/ns3=1(?:;|$)/.test(document.cookie), "Write a Boolean true value");
+						cookieLib("ns4", 0, options);
+						ok(/ns4=0(?:;|$)/.test(document.cookie), "Write the Number 0");
+						cookieLib("ns5", 1, options);
+						ok(/ns5=1(?:;|$)/.test(document.cookie), "Write the Number 1");
+						cookieLib("ns6", .5, options);
+						ok(/ns6=0.5(?:;|$)/.test(document.cookie), "Write a decimal value");
+						cookieLib("ns7", -123.456, options);
+						ok(/ns7=-123.456(?:;|$)/.test(document.cookie), "Write a float value");
+					
+					},newSingleRead = function(cookieLib, options) {
+						expect(10); clearAllCookies();
+						
+						equals(cookieLib("ns0", options), false, "Try to read an empty cookie");
+						document.cookie = "ns0=ns0"+path;
+						equals(cookieLib("ns0", options), "ns0", "Read a first string value");
+						document.cookie = "ns1=ns1"+path;
+						equals(cookieLib("ns1", options), "ns1", "Read a second string value");
+						document.cookie = "ns2="+false+path;
+						equals(cookieLib("ns2", options), "false", "Read a serialized false value");
+						document.cookie = "ns3="+true+path;
+						equals(cookieLib("ns3", options), "true", "Read a serialized true value");
+						document.cookie = "ns4="+0+path;
+						same(cookieLib("ns4", options), 0, "Read a serialized 0");
+						document.cookie = "ns5="+1+path;
+						same(cookieLib("ns5", options), 1, "Read a serialized 1");
+						document.cookie = "ns6="+.5+path;
+						same(cookieLib("ns6", options), .5, "Read a serialized decimal");
+						document.cookie = "ns7="+encodeURIComponent(-123.456)+path;
+						same(cookieLib("ns7", options), -123.456, "Read a serialized float");
+						equals(cookieLib("ns99", options), false, "Read an inexistant value");
+					
+					}, newSingleReturn = function(cookieLib, options) {
+						expect(8); clearAllCookies();
+						
+						equals(cookieLib("ns8", "ns8", options), "ns8", "Return a String value");
+						same(cookieLib("ns9", false, options), false, "Return a Boolean false value");
+						same(cookieLib("ns10", true, options), true, "Return a Boolean true value");
+						same(cookieLib("ns11", 0, options), 0, "Return the number 0");
+						same(cookieLib("ns12", 1, options), 1, "Return the number 1");
+						equals(cookieLib("ns13", .5, options), .5, "Return a decimal value");
+						equals(cookieLib("ns14", -123.456, options), -123.456, "Return a decimal value");
+						same(cookieLib("ns15", null, options), null, "Return a null value");
+						
+					}, newMultiWrite = function(options) {
+						expect(2); clearAllCookies();
+						
+						$.cookie({nm0: "nm0"}, options);
+						ok(/nm0=nm0/.test(document.cookie), "Writing a single value using an object");
+						$.cookie({nm1: "nm1", nm1: "nm1Bis", nm2: false, nm3: true, nm4: 0, nm5: 1, nm6: .5, nm7: -123.456}, options);
+						ok(/(?=(?=(?=(?=(?=(?=(?=.*nm1=nm1Bis(?:;|$)).*nm2=0(?:;|$)).*nm3=1(?:;|$)).*nm4=0(?:;|$)).*nm5=1(?:;|$)).*nm6=0.5(?:;|$)).*nm7=-123.456(?:;|$))/.test(document.cookie), "Writing multiple values using an object");
+						
+					}, newMultiRead = function(options) {
+						expect(3); clearAllCookies();
+					
+						equals($.cookie(true, options), false, "Read an empty cookie");
+						document.cookie = "nm0=nm0"+path;
+						same($.cookie(true, options), {nm0: "nm0"}, "Read a cookie with a single value");
+						document.cookie = "nm1=nm1"+path;
+						document.cookie = "nm2="+false+path;
+						document.cookie = "nm3="+true+path;
+						document.cookie = "nm4="+0+path;
+						document.cookie = "nm5="+1+path;
+						document.cookie = "nm6="+.5+path;
+						document.cookie = "nm7="+encodeURIComponent(-123.456)+path;
+						same($.cookie(true, options), {nm0: "nm0", nm1: "nm1", nm2: "false", nm3: "true", nm4: 0, nm5: 1, nm6: .5, nm7: -123.456}, "Read a cookie with multiple values");
+						
+					}, newMultiReturn = function(options) {
+						clearAllCookies();
+						
+						var obj = {lm0: "lm0", lm1: "lm1", lm2: "false", lm3: "true", lm4: "0", lm5: "1", lm6: "0.5", lm7: "-123.456"};
+						same($.cookie(obj, options), obj, "Return multiple values");
+					};
+					
+				test("Write a single value, smart enabled in options", function() {
+					newSingleWrite($._cookie, {smart: true});
+				});				
+				
+				test("Write a single value, smart enabled in options, with an expiry Date", function() {
+					newSingleWrite($._cookie, {smart: true, expires: tomorrow});
+				});
+				
+				test("Write a single value, smart enabled in options, with an expiry Number", function() {
+					newSingleWrite($._cookie, {smart: true, expires: 1});
+				});
+				
+				test("Read a single value, smart enabled in options", function() {
+					newSingleRead($._cookie, {smart: true});
+				});
+				
+				test("Write a single value, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newSingleWrite($._cookie);
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Read a single value, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newSingleRead($._cookie);
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Return the value", function() {
+					newSingleReturn($._cookie);
+				});
+				
+				test("Return the value, smart enabled in options", function() {
+					newSingleReturn($._cookie, {smart: true});
+				});
+				
+				
+				
+				test("Return the value, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newSingleReturn($._cookie);
+					$.cookie.defaults.smart = false;
+				});
+				
+				module("New + multi");
+				
+				test("Write a single value through the 'multi' plugin, smart enabled in options", function() {
+					newSingleWrite($.cookie, {smart: true});
+				});
+				
+				test("Read a single value through the 'multi' plugin, smart enabled in options", function() {
+					newSingleRead($.cookie, {smart: true});
+				});
+				
+				
+				
+				test("Write a single value through the 'multi' plugin, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newSingleWrite($.cookie);
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Read a single value through the 'multi' plugin, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newSingleRead($.cookie);
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Return the value through the 'multi' plugin", function() {
+					newSingleReturn($.cookie);
+				});
+				
+				test("Return the value through the 'multi' plugin, smart enabled in options", function() {
+					newSingleReturn($.cookie, {smart: true});
+				});
+				
+				test("Return the value through the 'multi' plugin, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newSingleReturn($.cookie);
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Return multiple values", function() {
+					newMultiReturn();
+				});
+				
+				test("Write multiple values, smart enabled in options", function() {
+					newMultiWrite({smart: true});
+				});
+				
+				test("Read multiple values, smart enabled in options", function() {
+					newMultiRead({smart: true});
+				});
+				
+				test("Return multiple values, smart enabled in options", function() {
+					newMultiReturn({smart: true});
+				});
+				
+				
+				
+				test("Write multiple values, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newMultiWrite();
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Read multiple values, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newMultiRead();
+					$.cookie.defaults.smart = false;
+				});
+				
+				test("Return multiple values, smart enabled by default", function() {
+					$.cookie.defaults.smart = true;
+					newMultiReturn();
+					$.cookie.defaults.smart = false;
+				});
+				
+				module("Special characters");
+				
+				test("If every other tests pass, test special characters with the library itself", function() {
+					expect(4); clearAllCookies();
+					var string = '<a href="http://en.wikipedia.com/wiki/Unit testing">{è}[é]&$=%20s^?=+-§;*ç`/s\\s</a>'
+					
+					$._cookie("sc0", string);
+					equals($._cookie("sc0"), string, "Special character through legacy features");
+					$._cookie("sc1", string, {smart: true});
+					equals($._cookie("sc1"), string, "Special character through legacy features, smart enabled in option");
+					$.cookie({sc2: string});
+					equals($.cookie(true).sc2, string, "Special character through multi plugin");
+					$.cookie({sc3: string}, {smart: true});
+					equals($.cookie(true, {smart: true}).sc3, string, "Special character through multi plugin, smart enabled in option");				
+				});
+				
+				console.log(document.cookie)
+			});
+			
+			function writeCookie(key, value, expireDays) {
+				if(value === null) {
+					value = '';
+					expireDays = -1;
+				}
+				var day = new Date();
+				day.setDate(day.getDate() + expireDays);
+				document.cookie = key +"="+ encodeURIComponent(value) + 
+					(expireDays? ";expires="+ day.toUTCString() : "") +
+					path;
+			}
+			
+			function readCookie(key) {
+				if(document.cookie) {
+					var match = new RegExp(key+"=(.*?)(?:;|$)").exec(document.cookie);
+					if(match) return decodeURIComponent(match[1]);
+				}
+				return false
+			}
+			
+			function clearCookie(key) {
+				writeCookie(key, "", -1);				
+			}
+			
+			// Clear all cookie values
+			function clearAllCookies() {
+				var match = document.cookie.match(/(?:^| ).*?(?==)/g);
+				for(var i in match)
+					// Make sure i is a number for this stupid IE
+					if(parseFloat(i) +"" == i)
+						clearCookie($.trim(match[i]));
+			}
+		</script>
+	</body>
+</html>
